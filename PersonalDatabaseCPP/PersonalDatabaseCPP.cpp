@@ -35,11 +35,13 @@ int read_data(char _filename[], int _maxsize, char _profiles[][FIELDS][STRING_SI
 void save_data(char _filename[], int _records, char _profiles[][FIELDS][STRING_SIZE]);
 
 int find_user_data(int _records, char _profiles[][FIELDS][STRING_SIZE]);
+void add_user(int &_records, char _profiles[][FIELDS][STRING_SIZE]);
+void edit_user(int _records, char _profiles[][FIELDS][STRING_SIZE]);
 
 void sort_profiles(int _records, char _profiles[][FIELDS][STRING_SIZE], bool _ascending);
 bool name_compare(char _a[][STRING_SIZE], char _b[][STRING_SIZE], bool _ascending);
 
-void get_input(int _stringsize, char _str[]);
+void get_input(int _stringsize, char _str[], bool _firsttoken);
 void wait_for_input();
 void clean_input();
 
@@ -70,26 +72,32 @@ int _tmain(int argc, _TCHAR* argv[])
 		{
 			case 1:
 				find_user_data(records, profiles);
+				wait_for_input();
 			break;
 			case 2:
-
+				add_user(records, profiles);
+				wait_for_input();
 			break;
 			case 3:
-
+				edit_user(records, profiles);
+				wait_for_input();
 			break;
 			case 4:
 				print_data(records, profiles);
+				wait_for_input();
 			break;
 			case 5:
-				cout << "Goodbye!";
+				cout << endl << "Goodbye!" << endl;
 				done = true;
 			break;
 			default:
-				cout << "Invalid Choice";
+				cout << endl << "Invalid Choice!";
 			break;
 		}
 	}
 	save_data("profiles.dtb", records, profiles);
+
+	wait_for_input();
 
 	return 0;
 }
@@ -97,18 +105,29 @@ int _tmain(int argc, _TCHAR* argv[])
 
 // ** PROGRAM FUNCTIONS ** //
 
-// print
+// ** print ** //
 void print_data(int _records, char _profiles[][FIELDS][STRING_SIZE])
 {
-	cout << "--------------------------------------------------------------" << endl;
-	for (int i = 0; i < _records; i++)
+	
+	cout << endl << "--------------------------------------------------------------" << endl;
+	if (_records > 0)
 	{
-		print_profile(_profiles[i]);
+		for (int i = 0; i < _records; i++)
+		{
+			print_profile(_profiles[i]);
+		}
 	}
+	else
+		cout << "No records in database..." << endl;
+
+	cout << endl << "--------------------------------------------------------------" << endl;
+	cout << endl << "Total: " << _records << " records" << endl;
 }
 
 void print_menu()
 {
+	cout.flush();
+
 	cout << endl << "--------------------------------------------------------------" << endl;
 	cout << "\tPersonal Database" << endl << endl
 		<< "1. Find a person's information" << endl
@@ -119,21 +138,26 @@ void print_menu()
 		<< "input: ";
 }
 
+//print profile to screen with endl
 void print_profile(char _profile[FIELDS][STRING_SIZE])
 {
-	cout << _profile[LNAME] << " "
-		<< _profile[FNAME] << " "
-		<< _profile[PHONE] << " "
-		<< _profile[BDATE] << endl;
+	//+FIELDS for spaces in between...
+	char pstring[STRING_SIZE*FIELDS + FIELDS] = { "" };
+	profile_string(_profile, pstring);
+
+	cout << pstring << endl;
 }
+//print profile to _file without endl
 void print_profile(ofstream &_file, char _profile[FIELDS][STRING_SIZE])
 {
-	_file << _profile[LNAME] << " "
-		<< _profile[FNAME] << " "
-		<< _profile[PHONE] << " "
-		<< _profile[BDATE];
+	//+FIELDS for spaces in between...
+	char pstring[STRING_SIZE*FIELDS + FIELDS] = { "" };
+	profile_string(_profile, pstring);
+
+	_file << pstring;
 }
 
+//stores the full profile string in _str
 void profile_string(char _profile[FIELDS][STRING_SIZE], char _str[])
 {
 	strcpy(_str, _profile[LNAME]);
@@ -145,7 +169,7 @@ void profile_string(char _profile[FIELDS][STRING_SIZE], char _str[])
 	strcat(_str, _profile[BDATE]);
 }
 
-// file data
+// ** file data ** //
 int read_data(char _filename[], int _maxsize, char _profiles[][FIELDS][STRING_SIZE])
 {
 	int records = 0;
@@ -153,6 +177,7 @@ int read_data(char _filename[], int _maxsize, char _profiles[][FIELDS][STRING_SI
 	ifstream file = file_open_read(_filename);
 	if (file.is_open())
 	{
+		// do:while loop for simplified priming read
 		do
 		{
 			for (int i = 0; i < FIELDS; i++)
@@ -160,11 +185,9 @@ int read_data(char _filename[], int _maxsize, char _profiles[][FIELDS][STRING_SI
 				file >> _profiles[records][i];
 			}
 			//ignore blank lines
-			if(strlen(_profiles[records][0]) > 0) records++;
-		} while (!file.eof());
+			if(strlen(_profiles[records][LNAME]) > 0) records++;
+		} while (!file.eof() && records < _maxsize);
 	}
-	//for priming read...
-	records = (records == 1) ? 0 : records;
 
 	sort_profiles(records, _profiles, true);
 	
@@ -188,49 +211,53 @@ void save_data(char _filename[], int _records, char _profiles[][FIELDS][STRING_S
 }
 
 
-//menu choices
+// ** menu choices ** //
 int find_user_data(int _records, char _profiles[][FIELDS][STRING_SIZE])
 {
 	cout << endl << "Search For: ";
 	char search_name[STRING_SIZE * 2] = { "" };
-	get_input(STRING_SIZE * 2, search_name);
+	char tsearch[STRING_SIZE * 2] = { "" };
+	get_input(STRING_SIZE * 2, search_name, false);
 	
 	int results[DATABASE_SIZE];
 	int rsize = 0;
+	
 
-	char *token;
-	int num_tokens = 0;
-	char tsearch[STRING_SIZE * 2] = { "" };
-
+	//	loop through all profiles and find names that "match" the input.
 	for (int i = 0; i < _records; i++)
 	{
-		char *fname = _profiles[i][FNAME];
+		//pointers to the first and last names in a profile.
 		char *lname = _profiles[i][LNAME];
-		
-		//because strtok inserts \0 chars...
-		strcpy(tsearch, search_name);
-
+		char *fname = _profiles[i][FNAME];
 		bool lfound = false;
 		bool ffound = false;
-		
-		num_tokens = 0;
-		token = strtok(tsearch, " ");
 
+		//because strtok inserts null chars, we must use a separate cstring (tsearch)
+		strcpy(tsearch, search_name);
+		char *token = strtok(tsearch, " ");
+
+		/*	loop through all input tokens for the current profile
+		*	"token_found" ensures that the same token is not used for both first and last names.
+		*/
+		int num_tokens = 0;
 		while (token != NULL)
 		{
 			num_tokens++;
-			bool lft = false;
+			bool token_found = false;
 			if (!lfound)
 			{
 				lfound = (string_match(lname, token));
-				lft = lfound;
+				token_found = lfound;
 			}
-			if (!ffound && !lft) ffound = (string_match(fname, token));
+			if (!ffound && !token_found) ffound = (string_match(fname, token));
 
 			token = strtok(NULL, " ");
 		}
 
-
+		/*	
+		*	if a name begins with one of the input tokens, add its profile index to the results list.
+		*	if there is more than one token, both fname and lname must match the input.
+		*/
 		if (num_tokens > 1)
 		{
 			if (lfound && ffound) results[rsize++] = i;
@@ -241,9 +268,10 @@ int find_user_data(int _records, char _profiles[][FIELDS][STRING_SIZE])
 		}
 	}
 
+	//	if there is more than one result, question the user for the profile they meant to choose.
 	if (rsize > 1)
 	{
-		cout << endl << "did you mean?" << endl;
+		cout << endl << endl << "did you mean?" << endl;
 		for (int i = 0; i < rsize; i++)
 		{
 			cout << i + 1 << ". " << _profiles[results[i]][LNAME] << " " << _profiles[results[i]][FNAME] << endl;
@@ -259,6 +287,7 @@ int find_user_data(int _records, char _profiles[][FIELDS][STRING_SIZE])
 
 		return results[choice];
 	}
+	//otherwise print the first result
 	else if (rsize == 1)
 	{
 		cout << endl;
@@ -273,42 +302,7 @@ int find_user_data(int _records, char _profiles[][FIELDS][STRING_SIZE])
 	}
 }
 
-
-// profile manipulation
-void sort_profiles(int _records, char _profiles[][FIELDS][STRING_SIZE], bool _ascending)
-{
-	bool sorted = false;
-	for (int i = 0; i < _records - 1; i++)
-	{
-		sorted = true;
-		for (int j = 0; j < _records - 1; j++)
-		{
-			if (name_compare(_profiles[j], _profiles[j + 1], _ascending))
-			{
-				sorted = false;
-				swap(_profiles[j], _profiles[j + 1]);
-			}
-		}
-		if (sorted) break;
-	}
-}
-bool name_compare(char _a[][STRING_SIZE], char _b[][STRING_SIZE], bool _ascending)
-{
-	char n1[STRING_SIZE * 2] = {""};
-	strcat(n1, _a[LNAME]);
-	strcat(n1, _a[FNAME]);
-	char n2[STRING_SIZE * 2] = {""};
-	strcat(n2, _b[LNAME]);
-	strcat(n2, _b[FNAME]);
-
-	if (_ascending)
-		return (_stricmp(n1,n2) > 0);
-	else
-		return (_stricmp(n1, n2) < 0);
-}
-
-
-//cstring
+//returns true if _str2 matches exactly the FIRST characters in _str1.
 bool string_match(char _str1[], char _str2[])
 {
 	int len = min(strlen(_str1), strlen(_str2));
@@ -329,24 +323,153 @@ bool string_match(char _str1[], char _str2[])
 }
 
 
+void add_user(int &_records, char _profiles[][FIELDS][STRING_SIZE])
+{
+	if (_records >= DATABASE_SIZE)
+	{
+		cout << "Database Full!" << endl
+			<< "Do you wish to edit a profile instead?" << endl << endl
+			<< "(Y/N) : ";
+
+		char input[STRING_SIZE] = { "" };
+		get_input(STRING_SIZE, input, true);
+		if (toupper(input[0]) == 'Y') edit_user(_records, _profiles);
+	}
+	else
+	{
+		clean_input();
+		cout << "Enter last name: ";
+		get_input(STRING_SIZE, _profiles[_records][LNAME], true);
+		clean_input();
+
+		cout << "Enter first name: ";
+		get_input(STRING_SIZE, _profiles[_records][FNAME], true);
+		clean_input();
+
+		cout << "Enter phone number: ";
+		get_input(STRING_SIZE, _profiles[_records][PHONE], true);
+		clean_input();
+
+		cout << "Enter Birth Date (mm/dd/yyyy): ";
+		get_input(STRING_SIZE, _profiles[_records][BDATE], true);
+		clean_input();
+
+		cout << endl << "New Profile: ";
+		print_profile(_profiles[_records]);
+
+		sort_profiles(++_records, _profiles, true);
+	}
+}
+
+
+void edit_user(int _records, char _profiles[][FIELDS][STRING_SIZE])
+{
+	int index = find_user_data(_records, _profiles);
+
+	if (index > -1)
+	{
+		char *lname = _profiles[index][LNAME];
+		char *fname = _profiles[index][FNAME];
+		char *phone = _profiles[index][PHONE];
+		char *bdate = _profiles[index][BDATE];
+
+		char input[STRING_SIZE];
+		cout << endl << "Edit Data or press enter to leave as is:" << endl << endl
+			<< "Last Name (" << lname << ") : ";
+		get_input(STRING_SIZE, input, true);
+		if (strlen(input) > 0)
+			lname = input;
+
+		cout << endl << "First Name (" << fname << ") : ";
+		get_input(STRING_SIZE, input, true);
+		if (strlen(input) > 0)
+			fname = input;
+
+		cout << endl << "Phone Number (" << phone << ") : ";
+		get_input(STRING_SIZE, input, true);
+		if (strlen(input) > 0)
+			phone = input;
+
+		cout << endl << "Birth Date (" << bdate << ") : ";
+		get_input(STRING_SIZE, input, true);
+		if (strlen(input) > 0)
+			bdate = input;
+
+		cout << endl;
+
+		strcpy(_profiles[index][LNAME], lname);
+		strcpy(_profiles[index][FNAME], fname);
+		strcpy(_profiles[index][PHONE], phone);
+		strcpy(_profiles[index][BDATE], bdate);
+
+		cout << "Updated Info: ";
+		print_profile(_profiles[index]);
+		cout << endl;
+
+		sort_profiles(_records, _profiles, true);
+	}
+}
+
+// ** profile array manipulation ** //
+
+//flagged bubble sort based on names (last,first) in _ascending order
+void sort_profiles(int _records, char _profiles[][FIELDS][STRING_SIZE], bool _ascending)
+{
+	bool sorted = false;
+	for (int i = 0; i < _records - 1; i++)
+	{
+		sorted = true;
+		for (int j = 0; j < _records - 1; j++)
+		{
+			if (name_compare(_profiles[j], _profiles[j + 1], _ascending))
+			{
+				sorted = false;
+				swap(_profiles[j], _profiles[j + 1]);
+			}
+		}
+		if (sorted) break;
+	}
+}
+
+//returns true if the last and first names are in _ascending order
+bool name_compare(char _a[][STRING_SIZE], char _b[][STRING_SIZE], bool _ascending)
+{
+	char n1[STRING_SIZE * 2] = {""};
+	strcat(n1, _a[LNAME]);
+	strcat(n1, _a[FNAME]);
+	char n2[STRING_SIZE * 2] = {""};
+	strcat(n2, _b[LNAME]);
+	strcat(n2, _b[FNAME]);
+
+	if (_ascending)
+		return (_stricmp(n1,n2) > 0);
+	else
+		return (_stricmp(n1, n2) < 0);
+}
+
+
+
 
 // ** UTILITY FUNCTIONS ** //
 
-//input
-void get_input(int _stringsize, char _str[])
+// ** input ** //
+void get_input(int _stringsize, char _str[], bool _firsttoken)
 {
 	cin.ignore(cin.rdbuf()->in_avail());
 	cin.getline(_str,_stringsize);
+	if (_firsttoken) _str = strtok(_str, " ");
 	clean_input();
 }
 void wait_for_input()
 {
-	cout << "Press \"Enter\" to continue...";
-	char str[1];
-	cin.getline(str,1);
 	clean_input();
 
+	cout << endl << "Press \"Enter\" to continue...";
+	char str[1];
+	cin.getline(str,1);
 	cout << endl;
+
+	clean_input();
 }
 
 void clean_input()
@@ -355,7 +478,7 @@ void clean_input()
 	cin.ignore(cin.rdbuf()->in_avail());
 }
 
-//file manipulation
+// ** file manipulation ** //
 ifstream file_open_read(char _filepath[])
 {
 	ifstream fdata(_filepath);
