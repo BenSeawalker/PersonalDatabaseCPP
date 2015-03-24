@@ -378,22 +378,22 @@ void edit_user(int _records, char _profiles[][FIELDS][STRING_SIZE])
 			<< "Last Name (" << lname << ") : ";
 		get_input(STRING_SIZE, input, true);
 		if (strlen(input) > 0)
-			lname = input;
+			strcpy(lname, input);
 
 		cout << endl << "First Name (" << fname << ") : ";
 		get_input(STRING_SIZE, input, true);
 		if (strlen(input) > 0)
-			fname = input;
+			strcpy(fname, input);
 
 		cout << endl << "Phone Number (" << phone << ") : ";
 		get_input(STRING_SIZE, input, true);
 		if (strlen(input) > 0)
-			phone = input;
+			strcpy(phone, input);
 
 		cout << endl << "Birth Date (" << bdate << ") : ";
 		get_input(STRING_SIZE, input, true);
 		if (strlen(input) > 0)
-			bdate = input;
+			strcpy(bdate, input);
 
 		cout << endl;
 
